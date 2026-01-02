@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>西游闯关 | 斗战胜佛版</title>
+    <style>
+        /* =========================================
+           1. 视觉系统定义 (Visual System)
+           ========================================= */
+        :root {
+            --c-primary: #c0392b;       /* 丹漆红 */
+            --c-primary-dark: #922b21;
+            --c-gold: #f1c40f;          /* 佛光金 */
+            --c-gold-shine: #f9e79f;
+            --c-bg-dark: #1a0f0f;       /* 玄铁黑 */
+            --c-paper: #f4ecda;         /* 宣纸白 */
+            --c-text-ink: #2c3e50;      /* 徽墨 */
+            --c-success: #27ae60;
+            --c-error: #c0392b;
+            
+            --shadow-card: 0 15px 35px rgba(0,0,0,0.6), 0 5px 15px rgba(0,0,0,0.4);
+            /* 字体栈优化：优先 Mac华文楷体/Windows楷体/仿宋，最后回退到衬线体 */
+            --font-main: "STKaiti", "KaiTi", "SimKai", "BiauKai", "FangSong", "Lisu", "Microsoft YaHei", serif;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+            background-color: var(--c-bg-dark);
+            color: var(--c-text-ink);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            /* 全局增加微小的字间距，提升古风质感 */
+            letter-spacing: 0.05em;
+        }
+
+        /* =========================================
+           2. 动态背景 (Dynamic Background)
+           ========================================= */
+        .bg-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        /* 静态底图 */
+        .bg-static {
+            background: radial-gradient(circle at center bottom, #4a2c2c 0%, #1a0f0f 80%);
+            background-image: url("assets/bg-1.png");
+        }
+
+        /* 动态云层 */
+        .clouds {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cpath fill='%23ffffff' fill-opacity='0.05' d='M50 100 C70 80 130 80 150 100 S230 120 250 100 S330 80 350 100 S430 120 450 100 V200 H50 Z'/%3E%3C/svg%3E");
+            background-size: 800px 400px;
+            position: absolute;
+            width: 200%;
+            height: 100%;
+            bottom: 0;
+            animation: drift 60s linear infinite;
+        }
+        .clouds.c2 {
+            bottom: -50px;
+            opacity: 0.5;
+            animation-duration: 40s;
+            background-size: 600px 300px;
+        }
+
+        @keyframes drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+        /* =========================================
+           3. 主容器 (App Container - 横版优化)
+           ========================================= */
+        #app {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            /* PC端/横屏最大宽度设为 1000px，高度适配 */
+            max-width: 1000px; 
+            height: 100vh;
+            height: 100dvh; 
+            /* PC端限制高度，避免过于细长 */
+            max-height: 750px; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 768px) {
+            #app {
+                height: 90vh; /* 留出边距 */
+                border-radius: 24px;
+                border: 2px solid rgba(241, 196, 15, 0.3);
+                background: rgba(20, 10, 10, 0.6);
+                backdrop-filter: blur(10px);
+                box-shadow: 0 0 80px rgba(0,0,0,0.8);
+            }
+        }
+
+        /* 通用隐藏类 */
+        .hidden { display: none !important; }
+        .fade-enter { animation: fadeIn 0.8s ease forwards; }
+
+        /* =========================================
+           4. 首页 (Home Screen)
+           ========================================= */
+        .screen-home {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .avatar-ring {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 4px solid var(--c-gold);
+            padding: 6px;
+            background: linear-gradient(135deg, #4a0000, #000);
+            box-shadow: 0 0 40px var(--c-primary);
+            position: relative;
+            margin-bottom: 20px;
+            animation: pulseGlow 3s infinite;
+            flex-shrink: 0;
+        }
+        
+        .avatar-img {
+            width: 100%; height: 100%; border-radius: 50%;
+            object-fit: cover; background: #333;
+            /* 孙悟空头像：请确保 assets/hero-wukong-768x768.png 存在，否则显示灰色背景 */
+            background-image: url('assets/hero-wukong-768x768.png');
+            background-size: cover;
+            background-position: center;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .main-title {
+            font-size: 4rem;
+            margin: 0 0 40px 0;
+            font-weight: 900;
+            letter-spacing: 0.25em;
+            margin-left: 0.25em;
+            position: relative;
+            
+            /* 更加明亮鲜快的金色渐变 */
+            background: linear-gradient(
+                to bottom,
+                #fff 0%,
+                #fffde7 15%, /* 增加亮白比例 */
+                #ffeb3b 40%, /* 亮黄色 */
+                #fdd835 60%, /* 明金 */
+                #fbc02d 85%,
+                #f9a825 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            
+            /* 3D 立体阴影：颜色从深褐改为明亮的红橙色，增加鲜快感 */
+            filter: drop-shadow(0 0 20px rgba(255, 235, 59, 0.5));
+            text-shadow: 
+                0 1px 0 #d84315,
+                0 2px 0 #bf360c,
+                0 3px 0 #a23000,
+                0 4px 0 #8e2a00,
+                0 5px 0 #7a2400,
+                0 6px 1px rgba(0,0,0,.1),
+                0 0 5px rgba(0,0,0,.1),
+                0 1px 3px rgba(0,0,0,.3),
+                0 3px 5px rgba(0,0,0,.2),
+                0 5px 10px rgba(0,0,0,.25),
+                0 10px 10px rgba(0,0,0,.2),
+                0 20px 20px rgba(0,0,0,.15);
+            
+            /* 赋予标题微微的呼吸感和浮动感 */
+            animation: titleEpic 4s ease-in-out infinite;
+        }
+
+        @keyframes titleEpic {
+            0%, 100% { 
+                transform: translateY(0) scale(1); 
+                filter: drop-shadow(0 0 15px rgba(241, 196, 15, 0.4));
+            }
+            50% { 
+                transform: translateY(-5px) scale(1.02); 
+                filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.7));
+            }
+        }
+
+        .btn-epic {
+            position: relative;
+            background: linear-gradient(to bottom, #d35400, #a04000);
+            border: none;
+            padding: 16px 45px;
+            font-size: 1.3rem;
+            color: #fff;
+            font-family: var(--font-main);
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #6e2c00, 0 15px 20px rgba(0,0,0,0.4);
+            transition: all 0.1s;
+            min-width: 200px;
+            margin: 10px 0;
+            overflow: hidden;
+            /* 按钮文字间距 */
+            letter-spacing: 0.1em;
+            text-indent: 0.1em;
+        }
+        .btn-epic:active { transform: translateY(4px); box-shadow: 0 4px 0 #6e2c00; }
+        .btn-epic::after {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+            transform: rotate(45deg); animation: shine 3s infinite;
+        }
+
+        .btn-ghost {
+            background: transparent; border: 2px solid rgba(241, 196, 15, 0.5); color: var(--c-gold);
+            padding: 10px 30px; border-radius: 30px; font-size: 1rem; margin-top: 10px; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-ghost:hover { background: rgba(241, 196, 15, 0.1); border-color: var(--c-gold); }
+
+        /* =========================================
+           5. 游戏界面 (Game Screen - 布局核心)
+           ========================================= */
+        .screen-game {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        .hud-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(241, 196, 15, 0.3);
+            backdrop-filter: blur(5px);
+            padding: 8px 20px;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            color: var(--c-gold);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+        }
+        .hud-group { display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        .hud-icon { width: 24px; height: 24px; fill: var(--c-gold); filter: drop-shadow(0 0 5px orange); }
+
+        /* 心形 */
+        .hearts-wrapper { display: flex; gap: 4px; }
+        .heart-svg { width: 24px; height: 24px; fill: #e74c3c; transition: all 0.3s; filter: drop-shadow(0 0 2px #c0392b); }
+        .heart-svg.lost { fill: #555; transform: scale(0.8); filter: none; }
+
+        /* --- 滚动舞台 --- */
+        .card-stage {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            /* 隐藏滚动条但保留滚动功能 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+            /* 顶部改为 60px，给 absolute定位的徽章留出空间 */
+            padding: 60px 15px 100px 15px; 
+        }
+
+        .card-stage::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        /* --- 核心卡片 (横版/竖版 自适应) --- */
+        .scroll-card {
+            width: 100%;
+            background: var(--c-paper);
+            border-radius: 8px; 
+            position: relative;
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+            border-top: 12px solid #5d4037;
+            border-bottom: 12px solid #5d4037;
+            margin: 0 auto; /* 改为顶部对齐，防止高度变化时上下跳动 */
+            flex-shrink: 0;
+            
+            /* 默认竖版布局 */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 卷轴纹理背景 */
+        .scroll-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d7ccc8' fill-opacity='0.2'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7z'/%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5; pointer-events: none; z-index: 0;
+        }
+
+        .question-badge {
+            position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
+            background: var(--c-primary); color: #fff; padding: 5px 20px;
+            border: 2px solid var(--c-gold); border-radius: 8px; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 5px; white-space: nowrap;
+            z-index: 2;
+            /* 徽章字体优化 */
+            letter-spacing: 0.1em;
+            font-family: var(--font-main);
+        }
+
+        /* --- 图片区域 --- */
+        .q-image-frame {
+            position: relative; z-index: 1;
+            width: 100%;
+            height: 180px; 
+            background: #3e2723;
+            border: 4px solid #8d6e63; /* 加粗边框 */
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+        .q-image { width: 100%; height: 100%; object-fit: cover; transition: transform 3s ease; display: block; }
+        .scroll-card:hover .q-image { transform: scale(1.1); }
+
+        /* --- 内容区域 --- */
+        .card-content {
+            position: relative; z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .q-text {
+            /* 增加行高和字重，提升楷体易读性 */
+            font-size: 1.3rem; 
+            line-height: 1.6; 
+            color: #3e2723; 
+            font-weight: 600; /* 稍微加粗 */
+            margin-bottom: 20px; 
+            min-height: 40px; 
+            display: flex; 
+            align-items: center;
+            letter-spacing: 0.05em;
+        }
+
+        /* 选项容器 */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* 默认单列 */
+            gap: 10px;
+        }
+
+        .opt-btn {
+            width: 100%; padding: 14px; background: #fff;
+            border: 1px solid #d7ccc8; border-left: 5px solid #8d6e63;
+            border-radius: 6px; color: #5d4037; font-size: 1rem;
+            text-align: left; cursor: pointer; transition: all 0.2s; position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            /* 选项文字优化 */
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .opt-btn:hover { transform: translateX(3px); background: #fafafa; border-left-color: var(--c-primary); }
+        .opt-btn.correct { background: #d4edda; border-color: #28a745; border-left-color: #28a745; color: #155724; animation: pulseGreen 0.5s; }
+        .opt-btn.wrong { background: #f8d7da; border-color: #dc3545; border-left-color: #dc3545; color: #721c24; animation: shake 0.4s; }
+
+        .feedback-box {
+            margin-top: 0; 
+            padding: 0 12px; 
+            background: rgba(139, 69, 19, 0.08);
+            border-radius: 8px; 
+            text-align: center; 
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transform: translateY(10px); 
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 0.4s ease, 
+                        transform 0.4s ease,
+                        margin-top 0.4s ease,
+                        padding 0.4s ease;
+        }
+        .feedback-box.show { 
+            opacity: 1; 
+            max-height: 400px; /* 足够容纳解释文字的高度 */
+            transform: translateY(0); 
+            margin-top: 15px;
+            padding: 12px;
+        }
+
+        .btn-next {
+            background: var(--c-primary); color: #fff; border: none; padding: 8px 30px;
+            border-radius: 25px; font-size: 1rem; cursor: pointer; margin-top: 8px;
+            box-shadow: 0 4px 10px rgba(192, 57, 43, 0.4); display: none;
+        }
+
+        /* =========================================
+           7. 响应式布局优化 (Responsive Layout)
+           ========================================= */
+        
+        /* 平板/桌面端 (横版优化) */
+        @media (min-width: 768px) {
+            .scroll-card {
+                /* 改为横向 Flex 布局 */
+                flex-direction: row; 
+                align-items: stretch;
+                padding: 40px; /* 内边距加大 */
+            }
+
+            .q-image-frame {
+                width: 40%; /* 图片占左侧 40% */
+                height: auto; /* 高度自动跟随 */
+                min-height: 250px;
+                border-right: none;
+                margin-bottom: 0;
+                margin-right: 25px;
+            }
+
+            .card-content {
+                width: 60%; /* 内容占右侧 */
+                justify-content: center;
+            }
+
+            .q-text {
+                /* PC端字体稍大 */
+                font-size: 1.5rem;
+                margin-bottom: 25px;
+                justify-content: flex-start; /* 左对齐 */
+                line-height: 1.8;
+            }
+
+            /* 双列选项 */
+            .options-grid {
+                grid-template-columns: 1fr 1fr; 
+                gap: 15px;
+            }
+
+            .opt-btn {
+                padding: 16px;
+                font-size: 1.1rem;
+                text-align: center; /* 横版时居中对齐文字 */
+                border-left-width: 1px; /* 弱化左边框，改为整体感 */
+                border-bottom: 4px solid #d7ccc8; /* 增加底部立体感 */
+            }
+            .opt-btn:hover {
+                transform: translateY(-2px); /* 向上浮动 */
+                border-left-color: #d7ccc8; /* 恢复边框色 */
+                border-bottom-color: var(--c-primary);
+            }
+            .opt-btn.correct { border-bottom-color: #28a745; border-left-color: #28a745; }
+            .opt-btn.wrong { border-bottom-color: #dc3545; border-left-color: #dc3545; }
+        }
+
+        /* 动画关键帧 */
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 20px var(--c-primary); } 50% { box-shadow: 0 0 40px var(--c-gold); } 100% { box-shadow: 0 0 20px var(--c-primary); } }
+        @keyframes shine { 0% { left: -100%; } 20% { left: 100%; } 100% { left: 100%; } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+        @keyframes pulseGreen { 0% { transform: scale(1); } 50% { transform: scale(1.05); background: #c3e6cb; } 100% { transform: scale(1); } }
+        
+        .slide-in { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="bg-layer bg-static"></div>
+    <div class="bg-layer clouds"></div>
+    <div class="bg-layer clouds c2"></div>
+
+    <div id="app">
+        <!-- HOME SCREEN -->
+        <div id="screen-home" class="screen-home fade-enter">
+            <div class="avatar-ring">
+                <div class="avatar-img"></div>
+            </div>
+            <h1 class="main-title">西游闯关</h1>
+            <button class="btn-epic" onclick="startGame(true)">踏上征途</button>
+            <button class="btn-ghost" id="btn-continue" onclick="startGame(false)" style="display:none">继续修行</button>
+            <button class="btn-ghost" onclick="resetData()">重置轮回</button>
+            <div style="margin-top: 30px; color: #aaa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;">Journey to the West</div>
+        </div>
+
+        <!-- GAME SCREEN -->
+        <div id="screen-game" class="screen-game hidden">
+            <!-- HUD -->
+            <div class="hud-bar">
+                <div class="hud-group">
+                    <svg class="hud-icon" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+                    <span>第 <span id="level-display" class="hud-val">1</span> 难</span>
+                    <span style="font-size:0.8em; opacity:0.7; margin-left:5px">/ 10</span>
+                </div>
+                <div class="hud-group">
+                    <span style="font-size: 0.8em; color: #e67e22;" id="streak-display"></span>
+                    <svg class="hud-icon" style="fill:#f1c40f;" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                    <span id="score-display" class="hud-val">0</span>
+                </div>
+                <div class="hearts-wrapper" id="hearts-container"></div>
+            </div>
+
+            <!-- CARD STAGE -->
+            <div class="card-stage">
+                <div class="scroll-card slide-in">
+                    <div class="question-badge">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                        <span>天庭考题</span>
+                    </div>
+                    
+                    <!-- 左侧：图片 (PC端) / 顶部：图片 (移动端) -->
+                    <div class="q-image-frame">
+                        <img id="q-image" class="q-image" src="" alt="题目插图" onerror="this.src='https://placehold.co/600x400/5d4037/f4ecda?text=西游世界'">
+                    </div>
+
+                    <!-- 右侧：内容 (PC端) / 底部：内容 (移动端) -->
+                    <div class="card-content">
+                        <div class="q-text" id="question-text">加载中...</div>
+                        
+                        <!-- 选项使用 Grid 布局 -->
+                        <div id="options-container" class="options-grid"></div>
+
+                        <div class="feedback-box" id="feedback-area">
+                            <p id="explanation-text" style="color:#5d4037; margin-bottom:10px; font-size: 0.95rem;"></p>
+                            <button class="btn-next" id="next-btn" onclick="nextLevel()">下一难</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULT SCREEN -->
+        <div id="screen-result" class="screen-home hidden fade-enter">
+            <h2 class="main-title" id="result-title">修成正果</h2>
+            <div style="font-size: 5rem; color: var(--c-gold); font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 30px var(--c-primary);" id="final-score">0</div>
+            <p style="color: #ccc; margin-bottom: 30px;">最终功德</p>
+            <button class="btn-epic" onclick="showHome()">重返天庭</button>
+        </div>
+    </div>
+
+<script>
+    /* =========================================
+       GAME LOGIC
+       ========================================= */
+    const SVG_HEART = `<svg class="heart-svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+    const SVG_HEART_BROKEN = `<svg class="heart-svg lost" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+
+    const QUESTIONS_DB = [
+        { id: 1, imgKeyword: "金箍棒", question: "孙悟空的金箍棒重达多少斤？", options: ["一万三千五百斤", "三千六百斤", "九千斤", "十万八千斤"], answerIndex: 0, explanation: "金箍棒全名'如意金箍棒'，重一万三千五百斤。", reward: {score:10}, penalty:{hp:1} },
+        { id: 2, imgKeyword: "猪八戒", question: "唐僧的二徒弟是谁？", options: ["沙僧", "猪八戒", "小白龙", "孙悟空"], answerIndex: 1, explanation: "大徒弟孙悟空，二徒弟猪八戒（悟能），三徒弟沙悟净。", reward: {score:10}, penalty:{hp:1} },
+        { id: 3, imgKeyword: "五行山", question: "孙悟空被压在什么山下？", options: ["火焰山", "花果山", "五行山", "灵山"], answerIndex: 2, explanation: "如来佛祖将孙悟空压在五行山（后名两界山）下五百年。", reward: {score:10}, penalty:{hp:1} },
+        { id: 4, imgKeyword: "大闹天宫", question: "谁大闹了天宫？", options: ["哪吒", "二郎神", "孙悟空", "牛魔王"], answerIndex: 2, explanation: "孙悟空因不满弼马温官职和未被邀请蟠桃会，大闹天宫。", reward: {score:10}, penalty:{hp:1} },
+        { id: 5, imgKeyword: "雷音寺", question: "唐僧取经的目的地是哪里？", options: ["天庭", "西天雷音寺", "南海普陀山", "东海龙宫"], answerIndex: 1, explanation: "师徒四人前往西天大雷音寺拜佛求经。", reward: {score:10}, penalty:{hp:1} },
+        { id: 6, imgKeyword: "白骨精", question: "白骨精变化了几次来欺骗唐僧？", options: ["一次", "两次", "三次", "四次"], answerIndex: 2, explanation: "三打白骨精：先变村姑，再变老妇，最后变老翁。", reward: {score:10}, penalty:{hp:1} },
+        { id: 7, imgKeyword: "高老庄", question: "猪八戒在高老庄原本想娶谁？", options: ["高翠兰", "嫦娥", "女儿国国王", "铁扇公主"], answerIndex: 0, explanation: "猪八戒入赘高老庄，想娶高太公之女高翠兰。", reward: {score:10}, penalty:{hp:1} },
+        { id: 8, imgKeyword: "卷帘大将", question: "沙僧在被贬流沙河之前是什么官职？", options: ["天蓬元帅", "卷帘大将", "弼马温", "齐天大圣"], answerIndex: 1, explanation: "沙僧原是天庭的卷帘大将，因打破琉璃盏被贬。", reward: {score:10}, penalty:{hp:1} },
+        { id: 9, imgKeyword: "红孩儿", question: "红孩儿的绝招是什么？", options: ["三昧真火", "七十二变", "紧箍咒", "袖里乾坤"], answerIndex: 0, explanation: "红孩儿能在鼻中喷出三昧真火，连孙悟空都难以抵挡。", reward: {score:10}, penalty:{hp:1} },
+        { id: 10, imgKeyword: "芭蕉扇", question: "过火焰山需要借什么宝物？", options: ["紫金葫芦", "芭蕉扇", "定风珠", "羊脂玉净瓶"], answerIndex: 1, explanation: "只有铁扇公主的芭蕉扇能扇灭火焰山的火。", reward: {score:10}, penalty:{hp:1} },
+        { id: 11, imgKeyword: "女儿国", question: "女儿国国王想让谁留下成亲？", options: ["孙悟空", "猪八戒", "唐僧", "沙僧"], answerIndex: 2, explanation: "女儿国国王对唐僧情有独钟，愿以国相托。", reward: {score:10}, penalty:{hp:1} },
+        { id: 12, imgKeyword: "六耳猕猴", question: "真假美猴王中，假悟空是谁变的？", options: ["通臂猿猴", "六耳猕猴", "赤尻马猴", "灵明石猴"], answerIndex: 1, explanation: "六耳猕猴善聆音，能察理，知前后，万物皆明。", reward: {score:10}, penalty:{hp:1} },
+        { id: 13, imgKeyword: "菩提祖师", question: "孙悟空的授业恩师是谁？", options: ["太上老君", "观音菩萨", "菩提祖师", "唐僧"], answerIndex: 2, explanation: "孙悟空在灵台方寸山斜月三星洞拜菩提祖师为师。", reward: {score:10}, penalty:{hp:1} },
+        { id: 14, imgKeyword: "九齿钉耙", question: "猪八戒使用的武器是什么？", options: ["九齿钉耙", "降妖宝杖", "方天画戟", "宣花板斧"], answerIndex: 0, explanation: "猪八戒手持九齿钉耙，全名上宝沁金钯。", reward: {score:10}, penalty:{hp:1} },
+        { id: 15, imgKeyword: "观音菩萨", question: "哪位神仙帮助收服了红孩儿？", options: ["如来佛祖", "太上老君", "观音菩萨", "托塔天王"], answerIndex: 2, explanation: "观音菩萨用金箍收服红孩儿，让他做了善财童子。", reward: {score:10}, penalty:{hp:1} },
+        { id: 16, imgKeyword: "七十二变", question: "孙悟空有多少种变化？", options: ["三十六变", "七十二变", "一百零八变", "无数变"], answerIndex: 1, explanation: "孙悟空学会了地煞七十二变。", reward: {score:10}, penalty:{hp:1} },
+        { id: 17, imgKeyword: "唐僧肉", question: "吃唐僧肉可以长生不老的谣言是谁先传的？", options: ["白骨精", "金角大王", "并没有明确说明", "如来佛祖"], answerIndex: 2, explanation: "书中多处妖怪提到，但源头并未明确指向单一妖怪，通常认为是妖界的传言。", reward: {score:10}, penalty:{hp:1} },
+        { id: 18, imgKeyword: "人参果", question: "人参果树多少年结一次果？", options: ["三千年", "六千年", "九千年", "一万年"], answerIndex: 2, explanation: "三千年一开花，三千年一结果，三千年才成熟，共九千年。", reward: {score:10}, penalty:{hp:1} },
+        { id: 19, imgKeyword: "小白龙", question: "小白龙原本是哪里的太子？", options: ["东海", "南海", "西海", "北海"], answerIndex: 2, explanation: "小白龙是西海龙王三太子敖烈。", reward: {score:10}, penalty:{hp:1} },
+        { id: 20, imgKeyword: "火焰山", question: "太上老君的炼丹炉被孙悟空踢翻后变成了什么？", options: ["流沙河", "通天河", "火焰山", "五行山"], answerIndex: 2, explanation: "炉砖跌落凡间，化作了火焰山。", reward: {score:10}, penalty:{hp:1} },
+        { id: 21, imgKeyword: "金角银角", question: "金角大王和银角大王原本是做什么的？", options: ["烧火童子", "天庭守卫", "龙宫虾兵", "地府鬼差"], answerIndex: 0, explanation: "他们是太上老君看守金炉和银炉的童子。", reward: {score:10}, penalty:{hp:1} },
+        { id: 22, imgKeyword: "齐天大圣", question: "孙悟空在花果山称自己为什么？", options: ["美猴王", "齐天大圣", "孙行者", "斗战胜佛"], answerIndex: 1, explanation: "孙悟空竖起大旗，自称“齐天大圣”。", reward: {score:10}, penalty:{hp:1} },
+        { id: 23, imgKeyword: "紧箍咒", question: "紧箍咒是谁传给唐僧的？", options: ["如来佛祖", "观音菩萨", "玉皇大帝", "太上老君"], answerIndex: 1, explanation: "观音菩萨传授唐僧紧箍咒，以此约束悟空。", reward: {score:10}, penalty:{hp:1} },
+        { id: 24, imgKeyword: "车迟国", question: "车迟国三国师和孙悟空比试什么？", options: ["武艺", "求雨", "念经", "炼丹"], answerIndex: 1, explanation: "其中一场经典比试是祈雨，以及后续的砍头、剖心、下油锅。", reward: {score:10}, penalty:{hp:1} },
+        { id: 25, imgKeyword: "灵感大王", question: "通天河里的妖怪是什么成精？", options: ["鲤鱼", "乌龟", "河马", "鳄鱼"], answerIndex: 0, explanation: "灵感大王是观音菩萨莲花池里养大的金鱼。", reward: {score:10}, penalty:{hp:1} },
+        { id: 26, imgKeyword: "金铙", question: "黄眉大王用什么法宝困住了孙悟空？", options: ["金铙", "人种袋", "捆仙绳", "紫金铃"], answerIndex: 0, explanation: "黄眉怪先用金铙把悟空扣在里面，后用后天人种袋收人。", reward: {score:10}, penalty:{hp:1} },
+        { id: 27, imgKeyword: "八十一难", question: "西天取经一共经历了多少难？", options: ["七十二难", "八十难", "八十一难", "九十九难"], answerIndex: 2, explanation: "九九八十一难，少一难都不行（最后补了通天河老鼋一难）。", reward: {score:10}, penalty:{hp:1} },
+        { id: 28, imgKeyword: "斗战胜佛", question: "如来佛祖封孙悟空为什么佛？", options: ["旃檀功德佛", "斗战胜佛", "净坛使者", "金身罗汉"], answerIndex: 1, explanation: "孙悟空被封为斗战胜佛。", reward: {score:10}, penalty:{hp:1} },
+        { id: 29, imgKeyword: "净坛使者", question: "猪八戒最后被封为什么？", options: ["净坛使者", "金身罗汉", "天蓬元帅", "福星"], answerIndex: 0, explanation: "因其食肠宽大，被封为净坛使者，享受八方香火。", reward: {score:10}, penalty:{hp:1} },
+        { id: 30, imgKeyword: "吴承恩", question: "《西游记》的作者通常被认为是谁？", options: ["罗贯中", "施耐庵", "吴承恩", "曹雪芹"], answerIndex: 2, explanation: "明代小说家吴承恩。", reward: {score:10}, penalty:{hp:1} }
+    ];
+
+    const MAX_HP = 3;
+    const TOTAL_ROUNDS = 10; // 每局随机抽 10 道题
+    const STORAGE_KEY = 'xiYouData_v4'; // 更新 Key 以清理旧缓存
+    
+    let state = { 
+        questions: [], // 当前局的题目列表
+        idx: 0, 
+        score: 0, 
+        streak: 0, 
+        hp: MAX_HP, 
+        over: false 
+    };
+
+    const dom = {
+        screens: { home: document.getElementById('screen-home'), game: document.getElementById('screen-game'), result: document.getElementById('screen-result') },
+        btnCont: document.getElementById('btn-continue'),
+        level: document.getElementById('level-display'), score: document.getElementById('score-display'), streak: document.getElementById('streak-display'), hearts: document.getElementById('hearts-container'),
+        qText: document.getElementById('question-text'), qImg: document.getElementById('q-image'), 
+        opts: document.getElementById('options-container'), feedback: document.getElementById('feedback-area'), explain: document.getElementById('explanation-text'), nextBtn: document.getElementById('next-btn'),
+        card: document.querySelector('.scroll-card'), finalScore: document.getElementById('final-score'), resultTitle: document.getElementById('result-title')
+    };
+
+    window.onload = checkSave;
+
+    function checkSave() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const d = JSON.parse(saved);
+            // 检查存档是否有效且未结束
+            if (!d.over && d.hp > 0 && d.idx < d.questions.length) dom.btnCont.style.display = 'inline-block';
+        }
+    }
+
+    function startGame(isNew) {
+        if (isNew) { 
+            // 随机洗牌并抽取 10 道题
+            const shuffled = [...QUESTIONS_DB].sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, TOTAL_ROUNDS);
+            
+            state = { 
+                questions: selected,
+                idx: 0, 
+                score: 0, 
+                streak: 0, 
+                hp: MAX_HP, 
+                over: false 
+            }; 
+            save(); 
+        } else { 
+            state = JSON.parse(localStorage.getItem(STORAGE_KEY)); 
+        }
+        showScreen('game'); renderRound();
+    }
+
+    function showScreen(name) {
+        Object.values(dom.screens).forEach(el => el.classList.add('hidden'));
+        dom.screens[name].classList.remove('hidden');
+    }
+
+    function renderRound() {
+        // 检查是否通关 (当前索引 >= 题目总数)
+        if (state.idx >= state.questions.length) { endGame(true); return; }
+        
+        const q = state.questions[state.idx];
+        
+        dom.level.innerText = state.idx + 1; 
+        dom.score.innerText = state.score;
+        dom.streak.innerHTML = state.streak > 1 ? `🔥 x${state.streak}` : '';
+        dom.hearts.innerHTML = '';
+        for (let i = 0; i < MAX_HP; i++) dom.hearts.innerHTML += (i < state.hp) ? SVG_HEART : SVG_HEART_BROKEN;
+
+        dom.card.classList.remove('slide-in'); void dom.card.offsetWidth; dom.card.classList.add('slide-in');
+        
+        // 优先加载本地图片，失败则回退
+        dom.qImg.src = `assets/${q.id}.jpg`;
+        dom.qImg.onerror = function() {
+            this.src = `https://placehold.co/600x400/5d4037/f4ecda?text=${encodeURIComponent(q.imgKeyword)}`;
+            this.onerror = null; 
+        };
+        
+        dom.qText.innerText = q.question;
+        
+        dom.opts.innerHTML = ''; dom.feedback.classList.remove('show'); dom.nextBtn.style.display = 'none';
+
+        q.options.forEach((txt, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'opt-btn'; btn.innerText = txt;
+            btn.onclick = () => onAnswer(i, btn);
+            dom.opts.appendChild(btn);
+        });
+    }
+
+    let locked = false;
+    function onAnswer(choiceIdx, btn) {
+        if (locked) return; locked = true;
+        
+        const q = state.questions[state.idx];
+        const isRight = (choiceIdx === q.answerIndex);
+        
+        Array.from(dom.opts.children).forEach(b => b.disabled = true);
+
+        if (isRight) {
+            state.streak++; state.score += q.reward.score + (state.streak > 1 ? 2 : 0);
+            btn.classList.add('correct');
+        } else {
+            state.hp -= q.penalty.hp; state.streak = 0;
+            btn.classList.add('wrong');
+            dom.opts.children[q.answerIndex].classList.add('correct');
+        }
+        save();
+        
+        dom.explain.innerHTML = (isRight ? "<b style='color:#27ae60'>✅ 回答正确</b>" : "<b style='color:#c0392b'>❌ 回答错误</b>") + "<br>" + q.explanation;
+        dom.feedback.classList.add('show');
+
+        if (state.hp <= 0) { state.over = true; setTimeout(() => endGame(false), 2000); } 
+        else { 
+            dom.nextBtn.style.display = 'inline-block';
+            if (window.innerWidth < 768) {
+                setTimeout(() => dom.card.parentElement.scrollTo({ top: dom.card.parentElement.scrollHeight, behavior: 'smooth' }), 300);
+            }
+        }
+    }
+
+    function nextLevel() {
+        state.idx++; locked = false; save(); renderRound();
+        dom.card.parentElement.scrollTop = 0;
+    }
+
+    function endGame(win) {
+        showScreen('result');
+        dom.resultTitle.innerText = win ? "修成正果" : "重新来过";
+        dom.resultTitle.style.color = win ? "#f1c40f" : "#fff";
+        dom.finalScore.innerText = state.score;
+        localStorage.removeItem(STORAGE_KEY); dom.btnCont.style.display = 'none';
+    }
+
+    function showHome() { showScreen('home'); checkSave(); locked = false; }
+    function resetData() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+</script>
+</body>
+</html>
